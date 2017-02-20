@@ -21,8 +21,10 @@ export default class App extends React.Component {
         <Echo text="Hello, world! Find me in App.jsx!" />
 
         <div style={{ border: 'solid 1px grey' }}>
-          <p>This is a child container for nested routes</p>
-          {this.props.children || <Link to="/nested">Link to /nested. Click to show counter. Back/Forward buttons work.</Link>}
+          {this.props.children || <ul>
+            <li><Link to="/nested">Link to /nested.</Link></li>
+            <li><Link to="/login">Link to /login.</Link></li>
+          </ul> }
         </div>
       </div>
     );
