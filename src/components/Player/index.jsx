@@ -1,122 +1,239 @@
 // @flow
 
 import React from 'react';
+import * as siteapi from './../../siteapi';
 import { SongsAllRequest, SongSearchResponse } from './../../siteapi';
+import {
+  PLAYLIST_HISTORY_MAX,
+  PLAYLIST_ENQUEUE_NEXT,
+  PLAYLIST_ENQUEUE_LAST,
+} from "./../../constants/actionTypes";
+import {add_next, add_last, remove_at, playlist_init_state} from "reducers/playlist";
 
-export default class Player extends React.Component {
+import Search from "./search";
+
+export class Song extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    let __song__ = this.props['song'];
+
+    let play = function() {
+      this.props.onPlay({
+        'target': this,
+        'song': __song__,
+      });
+    }.bind(this);
+
+    let enqueueNext = function() {
+      this.props.onEnqueueNext({
+        'target': this,
+        'song': __song__,
+      });
+    }.bind(this);
+
+    let enqueueLast = function() {
+      this.props.onEnqueueLast({
+        'target': this,
+        'song': __song__,
+      });
+    }.bind(this);
+
+    let openAlbum = function() {
+      this.props.onOpenAlbum({
+        'target': this,
+        'song': __song__,
+      });
+    }.bind(this);
+
+    return (
+      // wtf is `key=...`? some React thing?
+      <tr key={__song__.id} data-id={__song__.id}>
+        <td data-col="title">
+          <button aria-label="Play" data-id="play" onClick={play} >
+            &#x25b6;
+          </button>
+          <button aria-label="Play Next" onClick={enqueueNext} >
+            Play Next
+          </button>
+          <button aria-label="Enqueue" onClick={enqueueLast} >
+            Enqueue
+          </button>
+          <button aria-label="Album" onClick={openAlbum} >
+            Show Album
+          </button>
+          <span>
+            <img src="" alt=""/>
+            {__song__.title()}
+          </span>
+        </td>
+        <td data-col="duration"><span>{__song__.duration()}</span></td>
+        <td data-col="artist" data-artist-name={__song__.artist()}>
+          <span className="column-content tooltip">
+            <a aria-label={"Artist: " + __song__.artist()}>
+              {__song__.artist()}
+            </a>
+          </span>
+        </td>
+        <td data-col="album" data-album-id={__song__._album.id}>
+          <span>
+            <a aria-label={"Album: " + __song__.album()}>
+              {__song__.album()}
+            </a>
+          </span>
+        </td>
+      </tr>
+    );
+  }
+}
+
+Song.propTypes = {
+  song: React.PropTypes.instanceOf(siteapi.Song),
+  onPlay: React.PropTypes.func.isRequired,
+  onEnqueueLast: React.PropTypes.func.isRequired,
+  onEnqueueNext: React.PropTypes.func.isRequired,
+  onOpenAlbum: React.PropTypes.func.isRequired,
+};
+
+export class QueueEntry extends React.Component {
+  constructor(props) {
+    super(props);
+  }
+
+  render() {
+    // wtf is `key=...`? some React thing?
+    let __song__ = this.props['song'];
+
+    let removeItem = function() {
+      this.props.onRemoveItem({
+        'target': this,
+        'index': this.props.index,
+        'song': __song__,
+      });
+    }.bind(this);
+    let enqueueNext = function() {
+      this.props.onEnqueueNext({
+        'target': this,
+        'song': __song__,
+      });
+    }.bind(this);
+    let jumpTo = function() {
+      this.props.onJumpTo({
+        'target': this,
+        'index': this.props.index,
+        'song': __song__,
+      });
+    }.bind(this);
+    
+    return (
+      <tr key={__song__.id} data-index={this.props.index} data-id={__song__.id}>
+        <button aria-label="Remove" data-id="play" onClick={removeItem} >
+          Remove
+        </button>
+        <button aria-label="Play Next" onClick={enqueueNext} >
+          Play Next
+        </button>
+        <button aria-label="Jump To" onClick={jumpTo} >
+          Jump To
+        </button>
+        <td data-col="title">
+          <span>
+            <img src="" alt=""/>
+            {__song__.title()}
+          </span>
+        </td>
+        <td data-col="duration"><span>{__song__.duration()}</span></td>
+        <td data-col="artist" data-artist-name={__song__.artist()}>
+          <span className="column-content tooltip">
+            <a aria-label={"Artist: " + __song__.artist()}>
+              {__song__.artist()}
+            </a>
+          </span>
+        </td>
+        <td data-col="album" data-album-id={__song__._album.id}>
+          <span>
+            <a aria-label={"Album: " + __song__.album()}>
+              {__song__.album()}
+            </a>
+          </span>
+        </td>
+      </tr>
+    );
+  }
+}
+
+QueueEntry.propTypes = {
+  song: React.PropTypes.instanceOf(siteapi.Song),
+  index: React.PropTypes.number.isRequired,
+  onRemoveItem: React.PropTypes.func.isRequired,
+  onEnqueueNext: React.PropTypes.func.isRequired,
+  onJunmpTo: React.PropTypes.func.isRequired,
+};
+
+class PlayManager {
+  txid: number;
+  player: HTMLAudioElement | undefined;
+  current: any;
+
+  constructor() {
+    this.txid = -1;
+    this.player = undefined; // document.createElement('audio');
+    this.current;
+  }
+
+  notify() {
+    if (this.current === undefined) {
+      if (this.player !== undefined) {
+        // current was set to undefined - cease playing.
+        this.player.pause();
+        this.player = undefined;
+        return;
+      }
+    }
+    if (this.player !== undefined && this.txid != this.current.queue_txid) {
+      this.player.pause();
+      this.player = undefined;
+    }
+    if (this.txid == this.current.queue_txid) {
+      // no change - continue playing normally.
+      return;
+    }
+
+    if (this.player === undefined) {
+      this.player = document.createElement('audio');
+    }
+
+    this.txid = this.current.queue_txid;
+    let src = document.createElement('source');
+    src.setAttribute('src', "http://music.yshi.org:8001/blob/" + this.current.song._blob);
+    this.player.appendChild(src);
+    this.player.onended = function() {
+      console.log("end notify");
+      this.notify();
+    }.bind(this);
+    this.player.play();
+  }
+}
+
+export class Player extends React.Component {
+  state: any;
+  _play_manager: PlayManager;
+
   constructor() {
     super();
-    this.state = new SongSearchResponse();
-    this.player = window.player = (function() {
-        var return_value = {};
-
-        function Player() {
-          this._context = new AudioContext();
-          this._playing = false;
-        }
-
-        Player.prototype = new Object();
-        Player.prototype.constructor = Player;
-
-        Player.prototype._start_immediate = function(buffer) {
-          let that = this;
-          var source = this._context.createBufferSource();
-          source.buffer = abuf;
-          source.connect(this._context.destination);
-          source.onended = function() {
-            that._track_finished();
-          }
-          source.start(0);
-        }
-
-        // Called when this player has finished playing a source
-        Player.prototype._track_finished = function() {
-          console.log("_track_finished");
-          if (this._queue.length > 0) {
-            this._start_immediate(this._queue[0]);
-            this._queue = this._queue.slice(1);
-          } else {
-            this._playing = false;
-          }
-        }
-
-        Player.prototype.enqueue = function(buffer) {
-          let that = this;
-          if (!this._playing) {
-            this._start_immediate(buffer);
-          } else {
-            this._queue.push(buffer);
-          }
-        }
-
-        function doHttpReq(method, url, xhrConfig) {
-          let xhr = new XMLHttpRequest();
-          xhr.responseType = "arraybuffer";
-          
-          if (xhrConfig !== undefined) {
-            xhrConfig(xhr);
-          }
-
-          return new Promise(function(resolve, reject) {
-            xhr.onreadystatechange = function(evt) {
-              if (this.readyState == XMLHttpRequest.DONE) {
-                if (this.status == 200) {
-                  resolve(xhr.response);
-                } else {
-                  reject(xhr)
-                }
-              }
-            };
-            xhr.open(method, url, true);
-            xhr.setRequestHeader("Authorization", "bearer " + window.localStorage['auth_token']);
-            xhr.send();
-          });
-        }
-
-        function trackGetter(context) {
-          return function getTrack(url) {
-            return doHttpReq("GET", url)
-              .then(function(buf) {
-                return context.decodeAudioData(buf);
-              });
-          }
-        }
-
-        var context = new AudioContext();
-        return_value['context'] = context;
-        var player = trackGetter(context);
-
-        return_value['playblob'] = function(bid) {
-          player("http://music.yshi.org:8001/blob/" + bid).then(function(abuf) {
-            return new Promise(function(resolve, reject) {
-              var source = context.createBufferSource();
-              source.buffer = abuf;
-              source.connect(context.destination);
-              
-              return_value['source'] = source;
-              source.onended = function(evt) {
-                console.log("source ended");
-                resolve();
-              }
-              source.start(0);
-            });
-          }).then(function() {
-            console.log("exit");
-          }).catch(function(err) {
-            console.log("error", err);
-          })
-        };
-
-        return return_value;
-      }());
-    // this.songPlay = this.songPlay.bind(this);
+    this.state = {};
+    this.state.songs = new SongSearchResponse();
+    this.state.queue = playlist_init_state();
+    this._play_manager = new PlayManager();
   }
 
   componentDidMount() {
     let _this = this;
     let req = new SongsAllRequest();
     req.execute().then(function(res) {
-      _this.setState(res);
+      _this.setState({'songs': res});
     }).catch(function(err) {
       console.log("err =", err);
     });
@@ -126,36 +243,91 @@ export default class Player extends React.Component {
     console.log("TODO: abort");
   };
 
-  onItemClick(song, event) {
-    console.log("play", song, event.currentTarget.dataset.id);
-    this.player.playblob(song._blob);
-    this.setState({ selectedItem: event.currentTarget.dataset.id });
-    //where 'id' =  whatever suffix you give the data-* li attribute
-  };
+  playSong(event: any) {
+    console.log("xxx playSong", event);
+    
+  }
+  enqueueNext(event: any) {
+    let next_queue = add_next(this.state.queue, event.song);
+    console.log("q=", next_queue._queue, "@", next_queue._cur_playing);
+    this._play_manager.current =next_queue._queue[next_queue._cur_playing];
+    this._play_manager.notify();
+    this.setState({'queue': next_queue});
+  }
+  enqueueLast(event: any) {
+    let next_queue = add_last(this.state.queue, event.song);
+    console.log("q=", next_queue._queue, "@", next_queue._cur_playing);
+    this._play_manager.current =next_queue._queue[next_queue._cur_playing];
+    this._play_manager.notify();
+    this.setState({'queue': next_queue});
+  }
+  openAlbum(event: any) {
+    console.log("TODO openAlbum", event);
+  }
+  queueRemove(event: any) {
+    let next_queue = remove_at(this.state.queue, event.song);
+    console.log("q=", next_queue._queue, "@", next_queue._cur_playing);
+    this._play_manager.current =next_queue._queue[next_queue._cur_playing];
+    this._play_manager.notify();
+    this.setState({'queue': next_queue});
+  }
+  queueJumpTo(event: any) {
+    console.log("TODO queueJumpTo", event);
+    console.log("q=", this.state.queue._queue, "@", this.state.queue._cur_playing);
+    this._play_manager.current =next_queue._queue[next_queue._cur_playing];
+    this._play_manager.notify();
+  }
 
   render() {
     let that = this;
     window.__xx = this;
-    console.log("state = ", this, this.state);
-    let clickHandler = this.onItemClick.bind(this);
     return (
       <div>
-        <h1>Player!</h1>
-        {this.state.results.map(function(song) {
-          return (
-            <div key={song.id} className="song">
-              <button data-id={song.id} onClick={clickHandler.bind(null, song)}>
-                Play
-              </button>
-              <span>{song.title()}</span>
-              &nbsp;by&nbsp;
-              <span>{song.artist()}</span>
-              &nbsp;on&nbsp;
-              <span>{song.album()}</span>
-            </div>
-          );
-        }, this)}
+        <h1>Queue</h1>
+        <table>
+          <thead>
+            <tr></tr>
+          </thead>
+          <tbody>
+            {this.state.queue._queue.map(function(entry, idx) {
+              return (
+                <QueueEntry
+                  song={entry.song}
+                  index={idx}
+                  onRemoveItem={this.queueRemove.bind(this)}
+                  onEnqueueNext={this.enqueueNext.bind(this)}
+                  onJumpTo={this.queueJumpTo.bind(this)}
+                  />
+              );
+            }, this)}
+          </tbody>
+        </table>
+        <h1>Songs</h1>
+        <table>
+          <thead>
+            <tr></tr>
+          </thead>
+          <tbody>
+            {this.state.songs.results.map(function(song, idx) {
+              return (
+                <Song
+                  song={song}
+                  onPlay={this.playSong}
+                  onEnqueueNext={this.enqueueNext.bind(this)}
+                  onEnqueueLast={this.enqueueLast.bind(this)}
+                  onOpenAlbum={this.openAlbum.bind(this)}
+                  />
+              );
+            }, this)}
+          </tbody>
+        </table>
       </div>
     );
   }
-}
+};
+
+// Player.propTypes = {
+//   songs: React.PropTypes.arrayOf(siteapi.Song),
+//   onIncrementClick: React.PropTypes.func.isRequired,
+//   onDecrementClick: React.PropTypes.func.isRequired,
+// };

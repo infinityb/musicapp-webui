@@ -10,13 +10,11 @@ import { syncHistoryWithStore, routerReducer } from 'react-router-redux';
 import { LoginRequest, LoginResponse } from 'siteapi';
 
 import App from 'components/App';
-import Counter from 'containers/Counter';
 import Login from 'containers/Login';
 import Player from 'containers/Player';
 
-
 import reducers from 'reducers';
-import siteapi from 'siteapi';
+import * as siteapi from 'siteapi';
 
 import s from 'styles/style.scss';
 
@@ -31,17 +29,20 @@ const store = createStore(
 
 const history = syncHistoryWithStore(browserHistory, store);
 
+console.log("playerx", Player);
 render(
   <Provider store={store}>
     <Router history={history}>
       <Route path="/" component={App} className={s.app}>
         <Route path="/login" component={Login} />
-        <Route path="/nested" component={Counter} />
       </Route>
       <Route path="/player" component={Player}>
-        
+
       </Route>
     </Router>
   </Provider>,
   document.getElementById('root'),
 );
+
+        /*<Route path="/search" component={PlayerSearch}>
+        </Route>*/

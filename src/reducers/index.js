@@ -1,5 +1,5 @@
 // @flow
 
-import counters from './counters';
+import playlist from './playlist';
 
-export default { counters };
+export default { playlist };

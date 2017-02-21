@@ -1,7 +1,6 @@
 // @flow
 
 import { connect } from 'react-redux';
-import { increment, decrement } from 'actions';
 import Login from 'components/Login';
 
 // const mapStateToProps = (state: State) => ({ value: state.counters.value });
