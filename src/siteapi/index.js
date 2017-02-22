@@ -102,16 +102,20 @@ export class SongsAllRequest {
     execute(): Promise<SongSearchResponse> {
         let that = this;
         return new Promise(function(resolve, reject) {
-            $.ajax("http://music.yshi.org:8001/songs ", {
+            $.ajax("http://music.yshi.org:8001/songs", {
                 method: "GET",
                 dataType: "json",
                 headers: {
                     "Authorization": "bearer " + window.localStorage['auth_token']
                 },
             }).done(function (msg) {
-                resolve(SongSearchResponse.fromDoc(msg));
+                try {
+                    resolve(SongSearchResponse.fromDoc(msg));
+                } catch (e) {
+                    reject(e);
+                }
             }).fail(function( jqXHR, textStatus ) {
-                console.log("err = ", jqXHR);
+                console.log("err: ", textStatus, "$$", jqXHR);
                 // enrich this.
                 reject(jqXHR);
             });
@@ -136,10 +140,12 @@ export class SongSearchResponse {
 }
 
 export class AlbumGetResponse {
+    songs: Array<Song>;
+
     static fromDoc(doc): AlbumGetResponse {
         let out = new AlbumGetResponse();
-        for (let x of doc['results']) {
-            out.results.push(Song.fromDoc(x));
+        for (let x of doc['songs']) {
+            out.songs.push(Song.fromDoc(x));
         }
         return out;
     }
@@ -163,7 +169,7 @@ export class AlbumGetRequest {
                     "Authorization": "bearer " + window.localStorage['auth_token']
                 },
             }).done(function (msg) {
-                resolve(SongSearchResponse.fromDoc(msg));
+                resolve(AlbumGetResponse.fromDoc(msg));
             }).fail(function( jqXHR, textStatus ) {
                 console.log("err = ", jqXHR);
                 // enrich this.
@@ -182,7 +188,6 @@ export class Song {
     _metadata: Map<string, string>;
 
     static fromDoc(doc: any): Song {
-        console.log("doc = ", doc);
         let out = new Song();
         out.id = doc['id'];
         out._album = Album.fromDoc(doc['album']);
@@ -193,7 +198,7 @@ export class Song {
         return out;
     }
 
-    _getMetaField(field: string): string {
+    _getMetaField(field: string, defval: ?string = undefined): string {
         let target = field.toUpperCase();
         for (let [k, v] of Object.entries(this._metadata)) {
             if (target == k.toUpperCase()) {
@@ -205,19 +210,22 @@ export class Song {
                 return v;
             }
         }
-        throw new KeyError();
+        if (defval != null) {
+            return defval;
+        }
+        throw new KeyError('key not found: ' + field);
     }
 
-    title(): string {
-        return this._getMetaField("TITLE");
+    title(defval:?string=undefined): string {
+        return this._getMetaField("TITLE", defval);
     }
 
-    artist(): string {
-        return this._getMetaField("ARTIST");
+    artist(defval:?string=undefined): string {
+        return this._getMetaField("ARTIST", defval);
     }
 
-    album(): string {
-        return this._getMetaField("ALBUM");
+    album(defval:?string=undefined): string {
+        return this._getMetaField("ALBUM", defval);
     }
 
     duration(): string {

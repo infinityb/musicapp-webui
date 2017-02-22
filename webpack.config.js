@@ -71,7 +71,7 @@ module.exports = {
       : new webpack.BannerPlugin({ banner: 'run with NODE_ENV=production to minify' })),
   ],
 
-  devtool: 'cheap-eval-source-map',
+  devtool: 'inline-source-map', // cheap-eval-source-map',
 
   devServer: {
     contentBase: 'app/ui/www',
@@ -87,7 +87,7 @@ module.exports = {
   },
 
   resolve: {
-    extensions: ['.js', '.jsx', '.ts'],
+    extensions: ['.js', '.jsx'],
     modules: ['node_modules', 'src'],
   },
 };

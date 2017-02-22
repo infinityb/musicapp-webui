@@ -1,0 +1,40 @@
+.title-row .title-right-items {
+  float: right;
+  line-height: 0;
+  text-indent: 0;
+}
+
+.title-row {
+  .aria-play-button-container {
+    width: 40px;
+    height: 40px;
+    display: inline-block;
+    padding: 8px;
+  }
+
+  .column-content {
+    display: inline-block;
+  }
+}
+
+.playing {
+  color: #329680;
+
+  a {
+    color: #329680;
+  }
+}
+
+.icon-container {
+  width: 40px;
+  height: 40px;
+  display: inline-block;
+  padding: 8px;
+}
+
+.icon {
+  width: 24px;
+  height: 24px;
+  display: block;
+  pointer-events: none;
+}

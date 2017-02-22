@@ -10,7 +10,7 @@ const mapStateToProps = (state: State) => ({ value: state.counters.value });
 
 const mapDispatchToProps = (dispatch: Dispatch) => ({
   onIncrementClick: () => dispatch(actions.increment()),
-  onDecrementClick: () => dispatch(decrement()),
+  onDecrementClick: () => dispatch(actions.decrement()),
 });
 
 const ContainedPlayer = connect(
