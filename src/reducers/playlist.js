@@ -1,10 +1,13 @@
 // @flow
 
 import {
-  PLAYLIST_ENQUEUE_LAST,
-  PLAYLIST_ENQUEUE_NEXT,
+  PLAYLIST_QUEUE_ADD_LAST,
+  PLAYLIST_QUEUE_ADD_NEXT,
+  PLAYLIST_QUEUE_JUMP_TO,
+  PLAYLIST_QUEUE_REMOVE,
   PLAYLIST_HISTORY_MAX,
   PLAYLIST_UPCOMING_DEFAULT,
+  PLAYLIST_MOVE_NEXT,
   // PLAYLIST_REMOVE_IDX,
 } from 'constants/actionTypes';
 
@@ -35,6 +38,7 @@ export function add_next(state: PlaylistState, song: siteapi.Song): PlaylistStat
 }
 
 export function remove_at(state: PlaylistState, index: number): PlaylistState {
+  console.log("set_index", index);
   let out = playlist_init_state();
   out._queue.push(...state._queue.slice(0, index));
   out._queue.push(...state._queue.slice(index + 1));
@@ -63,6 +67,15 @@ export function increment_index(state: PlaylistState): PlaylistState {
   return _fixup_index(out);
 }
 
+export function set_index(state: PlaylistState, index: number): PlaylistState {
+  console.log("set_index", index);
+  let out = playlist_init_state();
+  out._queue = state._queue.slice();
+  out._txid = state._txid;
+  out._cur_playing = index;
+  return _fixup_index(out);
+}
+
 export function playlist_init_state(): PlaylistState {
   return {
     _txid: 0,
@@ -71,12 +84,18 @@ export function playlist_init_state(): PlaylistState {
   };
 }
 
-export default (state: PlaylistState = playlist_init_state(),  action: Action) => {
+export default (state: PlaylistState = playlist_init_state(),  action: PlaylistAction) => {
   switch (action.type) {
-    case PLAYLIST_ENQUEUE_LAST:
+    case PLAYLIST_QUEUE_ADD_LAST:
       return add_last(state, action.song);
-    case PLAYLIST_ENQUEUE_NEXT:
+    case PLAYLIST_QUEUE_ADD_NEXT:
       return add_next(state, action.song);
+    case PLAYLIST_QUEUE_JUMP_TO:
+      return set_index(state, action.index);
+    case PLAYLIST_QUEUE_REMOVE:
+      return remove_at(state, action.index);
+    case PLAYLIST_MOVE_NEXT:
+      return increment_index(state);
     // case PLAYLIST_REMOVE_IDX:
     //  return remove_at(state, action.index);
     default:

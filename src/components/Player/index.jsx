@@ -5,34 +5,40 @@ import * as siteapi from './../../siteapi';
 import { SongsAllRequest, SongSearchResponse } from 'siteapi';
 import {
   PLAYLIST_HISTORY_MAX,
-  PLAYLIST_ENQUEUE_NEXT,
-  PLAYLIST_ENQUEUE_LAST,
+  PLAYLIST_QUEUE_ADD_NEXT,
+  PLAYLIST_QUEUE_ADD_LAST,
 } from "./../../constants/actionTypes";
 import {add_next, add_last, remove_at, playlist_init_state, increment_index} from "reducers/playlist";
 
 import Search from "./search";
 import s from './styles.scss';
 
+function getMetaContentByName(name, content, defval) {
+    var content = (content == null) ? 'content' : content;
+    var node = document.querySelector("meta[name='"+name+"']");
+    if (node == null) {
+        return defval;
+    }
+    var val = node.getAttribute(content);
+    if (val == null) {
+        return defval;
+    }
+    return val;
+}
+
 export class Song extends React.Component {
   render() {
     let __song__ = this.props['song'];
 
-    let play = function() {
-      this.props.onPlay({
-        'target': this,
-        'song': __song__,
-      });
-    }.bind(this);
-
     let enqueueNext = function() {
-      this.props.onEnqueueNext({
+      this.props.onQueueAddNext({
         'target': this,
         'song': __song__,
       });
     }.bind(this);
 
     let enqueueLast = function() {
-      this.props.onEnqueueLast({
+      this.props.onQueueAddLast({
         'target': this,
         'song': __song__,
       });
@@ -49,9 +55,6 @@ export class Song extends React.Component {
       // wtf is `key=...`? some React thing?
       <tr key={__song__.id} data-id={__song__.id}>
         <td data-col="title">
-          <button aria-label="Play" data-id="play" onClick={play} >
-            &#x25b6;
-          </button>
           <button aria-label="Play Next" onClick={enqueueNext} >
             Play Next
           </button>
@@ -88,9 +91,8 @@ export class Song extends React.Component {
 
 Song.propTypes = {
   song: React.PropTypes.instanceOf(siteapi.Song),
-  onPlay: React.PropTypes.func.isRequired,
-  onEnqueueLast: React.PropTypes.func.isRequired,
-  onEnqueueNext: React.PropTypes.func.isRequired,
+  onQueueAddLast: React.PropTypes.func.isRequired,
+  onQueueAddNext: React.PropTypes.func.isRequired,
   onOpenAlbum: React.PropTypes.func.isRequired,
 };
 
@@ -106,6 +108,9 @@ export class QueueEntry extends React.Component {
   render() {
     // wtf is `key=...`? some React thing?
     let __song__ = this.props['song'];
+    if (__song__ == undefined) {
+      throw '__song__ is undefined';
+    }
 
     let removeItem = function() {
       this.props.onRemoveItem({
@@ -115,7 +120,7 @@ export class QueueEntry extends React.Component {
       });
     }.bind(this);
     let enqueueNext = function() {
-      this.props.onEnqueueNext({
+      this.props.onQueueAddNext({
         'target': this,
         'song': __song__,
       });
@@ -169,7 +174,7 @@ QueueEntry.propTypes = {
   song: React.PropTypes.instanceOf(siteapi.Song),
   index: React.PropTypes.number.isRequired,
   onRemoveItem: React.PropTypes.func.isRequired,
-  onEnqueueNext: React.PropTypes.func.isRequired,
+  onQueueAddNext: React.PropTypes.func.isRequired,
   onJumpTo: React.PropTypes.func.isRequired,
 };
 
@@ -196,6 +201,10 @@ class PlayManager {
         return;
       }
     }
+    if (this.current == null) {
+      console.log("no current - bail");
+      return;
+    }
 
     if (this.player != null) {
       let player: HTMLAudioElement = this.player;
@@ -218,7 +227,8 @@ class PlayManager {
 
     this.txid = this.current.queue_txid;
     let src = document.createElement('source');
-    src.setAttribute('src', "http://music.yshi.org:8001/blob/" + this.current.song._blob);
+    let blob_base = getMetaContentByName("yshi-musicapp-content", undefined, "");
+    src.setAttribute('src', blob_base + "blob/" + this.current.song._blob);
     player.appendChild(src);
     player.onended = function() {
       if (this._onended !== undefined) {
@@ -233,21 +243,14 @@ export class Player extends React.Component {
   state: any;
   _play_manager: PlayManager;
 
-  constructor() {
-    super();
+  constructor(props) {
+    super(props);
     this.state = {};
     this.state.songs = new SongSearchResponse();
     this.state.queue = playlist_init_state();
     this._play_manager = new PlayManager();
-    this._play_manager._onended = this.onSongFinish.bind(this);
+    this._play_manager._onended = this.props.onSongFinish.bind(this);
   }
-
-  onSongFinish() {
-    let next_queue = increment_index(this.state.queue);
-    this.syncPlayerState(next_queue);
-    this.setState({'queue': next_queue});
-  }
-
   componentDidMount() {
     let _this = this;
     let req = new SongsAllRequest();
@@ -258,45 +261,27 @@ export class Player extends React.Component {
       console.log("err =", err);
     });
   };
-
   componentWillUnmount() {
     console.log("TODO: abort");
   };
-
+  componentDidUpdate() {
+    console.log("this.props.queue = ", this.props.queue);
+    this.syncPlayerState(this.props.queue);
+  }
   playSong(event: any) {
     console.log("TODO playSong", event);
-  }
-  enqueueNext(event: any) {
-    let next_queue = add_next(this.state.queue, event.song);
-    this.syncPlayerState(next_queue);
-    this.setState({'queue': next_queue});
-  }
-  enqueueLast(event: any) {
-    let next_queue = add_last(this.state.queue, event.song);
-    this.syncPlayerState(next_queue);
-    this.setState({'queue': next_queue});
   }
   openAlbum(event: any) {
     console.log("TODO openAlbum", event);
   }
-  queueRemove(event: any) {
-    let next_queue = remove_at(this.state.queue, event.index);
-    this.syncPlayerState(next_queue);
-    this.setState({'queue': next_queue});
-  }
-  queueJumpTo(event: any) {
-    console.log("TODO queueJumpTo", event);
-    // this.syncPlayerState(next_queue);
-  }
   syncPlayerState(queue: any) {
-    console.log("aaa", queue._queue, queue._cur_playing);
     this._play_manager.current = queue._queue[queue._cur_playing];
     this._play_manager.notify();
   }
-
   render() {
     let that = this;
     window.__xx = this;
+
     return (
       <div>
         <h1>Queue</h1>
@@ -305,15 +290,15 @@ export class Player extends React.Component {
             <tr></tr>
           </thead>
           <tbody>
-            {this.state.queue._queue.map(function(entry, idx) {
+            {this.props.queue._queue.map(function(entry, idx) {
               return (
                 <QueueEntry
                   song={entry.song}
                   index={idx}
-                  onRemoveItem={this.queueRemove.bind(this)}
-                  onEnqueueNext={this.enqueueNext.bind(this)}
-                  onJumpTo={this.queueJumpTo.bind(this)}
-                  playing={idx == this.state.queue._cur_playing}
+                  onRemoveItem={this.props.onQueueRemove.bind(this)}
+                  onQueueAddNext={this.props.onQueueAddNext.bind(this)}
+                  onJumpTo={this.props.onQueueJumpTo.bind(this)}
+                  playing={idx == this.props.queue._cur_playing}
                   />
               );
             }, this)}
@@ -330,9 +315,9 @@ export class Player extends React.Component {
                 <Song
                   song={song}
                   onPlay={this.playSong}
-                  onEnqueueNext={this.enqueueNext.bind(this)}
-                  onEnqueueLast={this.enqueueLast.bind(this)}
-                  onOpenAlbum={this.openAlbum.bind(this)}
+                  onQueueAddNext={this.props.onQueueAddNext.bind(this)}
+                  onQueueAddLast={this.props.onQueueAddLast.bind(this)}
+                  onOpenAlbum={this.props.onOpenAlbum.bind(this)}
                   />
               );
             }, this)}
@@ -343,8 +328,11 @@ export class Player extends React.Component {
   }
 };
 
-// Player.propTypes = {
-//   songs: React.PropTypes.arrayOf(siteapi.Song),
-//   onIncrementClick: React.PropTypes.func.isRequired,
-//   onDecrementClick: React.PropTypes.func.isRequired,
-// };
+Player.propTypes = {
+  // songs: React.PropTypes.arrayOf(siteapi.Song),
+  onQueueAddNext: React.PropTypes.func.isRequired,
+  onQueueAddLast: React.PropTypes.func.isRequired,
+  onQueueJumpTo: React.PropTypes.func.isRequired,
+  onQueueRemove: React.PropTypes.func.isRequired,
+  onOpenAlbum: React.PropTypes.func.isRequired,
+};

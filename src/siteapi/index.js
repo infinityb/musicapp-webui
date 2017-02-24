@@ -12,6 +12,19 @@ export class jQueryExecutor {
     //
 }
 
+function getMetaContentByName(name, content, defval) {
+    var content = (content == null) ? 'content' : content;
+    var node = document.querySelector("meta[name='"+name+"']");
+    if (node == null) {
+        return defval;
+    }
+    var val = node.getAttribute(content);
+    if (val == null) {
+        return defval;
+    }
+    return val;
+}
+
 export class LoginRequest {
     fap: string;
     faat: string;
@@ -30,6 +43,7 @@ export class LoginRequest {
 
     execute(): Promise<LoginResponse> {
         let that = this;
+        let base = getMetaContentByName("yshi-musicapp-api", undefined, "");
         return new Promise(function(resolve, reject) {
             // let xhr = new XMLHttpRequest();
 
@@ -39,7 +53,7 @@ export class LoginRequest {
             //     //
             // };
             // xhr.send(
-            $.ajax("http://music.yshi.org:8001/login", {
+            $.ajax(base + "login", {
                 method: "POST",
                 dataType: "json",
                 data: JSON.stringify(that),
@@ -101,8 +115,9 @@ export class SongsAllRequest {
 
     execute(): Promise<SongSearchResponse> {
         let that = this;
+        let base = getMetaContentByName("yshi-musicapp-api", undefined, "");
         return new Promise(function(resolve, reject) {
-            $.ajax("http://music.yshi.org:8001/songs", {
+            $.ajax(base + "songs", {
                 method: "GET",
                 dataType: "json",
                 headers: {
@@ -161,8 +176,9 @@ export class AlbumGetRequest {
 
     execute(): Promise<AlbumGetResponse> {
         let that = this;
+        let base = getMetaContentByName("yshi-musicapp-api", undefined, "");
         return new Promise(function(resolve, reject) {
-            $.ajax("http://music.yshi.org:8001/songs ", {
+            $.ajax(base + "songs ", {
                 method: "GET",
                 dataType: "json",
                 headers: {
