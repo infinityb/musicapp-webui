@@ -8,10 +8,10 @@
     <script type="text/javascript">
       window.__google_loaded = new Promise(function(resolve, reject) {
         window.triggerGoogleLoaded = function() {
-          console.log("google loaded");
           resolve(window.gapi);
         };
       });
+
       window.__google_loaded.then(function(gapi) {
         console.log("google loaded", gapi);
       });

@@ -8,6 +8,7 @@ import {
   PLAYLIST_HISTORY_MAX,
   PLAYLIST_UPCOMING_DEFAULT,
   PLAYLIST_MOVE_NEXT,
+  PLAYLIST_MOVE_PREV,
   // PLAYLIST_REMOVE_IDX,
 } from 'constants/actionTypes';
 
@@ -67,6 +68,14 @@ export function increment_index(state: PlaylistState): PlaylistState {
   return _fixup_index(out);
 }
 
+export function decrement_index(state: PlaylistState): PlaylistState {
+  let out = playlist_init_state();
+  out._queue = state._queue.slice();
+  out._txid = state._txid;
+  out._cur_playing = state._cur_playing - 1;
+  return out; // never need to fixup - can't remove history when going back in time
+}
+
 export function set_index(state: PlaylistState, index: number): PlaylistState {
   console.log("set_index", index);
   let out = playlist_init_state();
@@ -96,6 +105,8 @@ export default (state: PlaylistState = playlist_init_state(),  action: PlaylistA
       return remove_at(state, action.index);
     case PLAYLIST_MOVE_NEXT:
       return increment_index(state);
+    case PLAYLIST_MOVE_PREV:
+      return decrement_index(state);
     // case PLAYLIST_REMOVE_IDX:
     //  return remove_at(state, action.index);
     default:

@@ -13,13 +13,13 @@ import {add_next, add_last, remove_at, playlist_init_state, increment_index} fro
 import Search from "./search";
 import s from './styles.scss';
 
-function getMetaContentByName(name, content, defval) {
-    var content = (content == null) ? 'content' : content;
+function getMetaContentByName(name, content: ?string = undefined, defval: ?string = undefined) {
+    var contentx = (content == null) ? 'content' : content;
     var node = document.querySelector("meta[name='"+name+"']");
     if (node == null) {
         return defval;
     }
-    var val = node.getAttribute(content);
+    var val = node.getAttribute(contentx);
     if (val == null) {
         return defval;
     }
@@ -53,7 +53,7 @@ export class Song extends React.Component {
 
     return (
       // wtf is `key=...`? some React thing?
-      <tr key={__song__.id} data-id={__song__.id}>
+      <tr data-id={__song__.id}>
         <td data-col="title">
           <button aria-label="Play Next" onClick={enqueueNext} >
             Play Next
@@ -134,16 +134,18 @@ export class QueueEntry extends React.Component {
     }.bind(this);
     
     return (
-      <tr key={__song__.id} className={this.rootClassNames()} data-index={this.props.index} data-id={__song__.id}>
-        <button aria-label="Remove" data-id="play" onClick={removeItem} >
-          Remove
-        </button>
-        <button aria-label="Play Next" onClick={enqueueNext} >
-          Play Next
-        </button>
-        <button aria-label="Jump To" onClick={jumpTo} >
-          Jump To
-        </button>
+      <tr className={this.rootClassNames()} data-index={this.props.index} data-id={__song__.id}>
+        <td>
+          <button aria-label="Remove" data-id="play" onClick={removeItem} >
+            Remove
+          </button>
+          <button aria-label="Play Next" onClick={enqueueNext} >
+            Play Next
+          </button>
+          <button aria-label="Jump To" onClick={jumpTo} >
+            Jump To
+          </button>
+        </td>
         <td data-col="title">
           <span>
             <img src="" alt=""/>
@@ -191,6 +193,16 @@ class PlayManager {
     this._onended = undefined;
   }
 
+  togglePause() {
+    if (this.player == null) {
+      return;
+    }
+    if (this.player.paused) {
+      this.player.play();
+    } else {
+      this.player.pause();
+    }
+  }
   notify() {
     if (this.player != null) {
       let player: HTMLAudioElement = this.player;
@@ -239,9 +251,86 @@ class PlayManager {
   }
 }
 
+export class ControlPanel extends React.Component {
+  _bound: any;
+
+  constructor(props) {
+    super(props);
+    this._bound = {
+      toggleQueueVisible: function() {
+        this.props.onToggleQueue({
+          'target': this,
+        });
+      }.bind(this),
+      sendGoNext: function() {
+        this.props.onGoNextSong({
+          'target': this,
+        });
+      }.bind(this),
+      sendGoPrev: function() {
+        this.props.onGoPrevSong({
+          'target': this,
+        });
+      }.bind(this),
+      sendPlayPause: function() {
+        this.props.onPlayPause({
+          'target': this,
+        });
+      }.bind(this),
+    }
+  }
+  render() {
+    let playing = null;
+    if (this.props.song != null) {
+      let song: siteapi.Song = this.props.song;
+      let imgsrc = null;
+      let contentRoot = getMetaContentByName('yshi-musicapp-content');
+      if (song._art_blob != null && contentRoot != null) {
+        imgsrc = contentRoot + "blob/" + song._art_blob;
+      } else {
+        imgsrc = "";
+      }
+      playing = (
+        <div>
+          <img style={{float: "left", width: "48px", height: "48px"}} src={ imgsrc }/>
+          <button style={{float: "left"}} onClick={this._bound.sendGoPrev}>prev</button>
+          <button style={{float: "left"}} onClick={this._bound.sendGoNext}>next</button>
+          <button style={{float: "left"}} onClick={this._bound.sendPlayPause}>play/pause</button>
+          <div style={{float: "left", marginLeft: "2em", display: "inline"}} >playing: {song.title()}</div>
+        </div>
+      );
+    } else {
+      playing = (
+        <div>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <button style={{float: "left"}} onClick={this._bound.toggleQueueVisible}>Expand Queue</button>
+        { playing }
+      </div>
+    );
+  }
+}
+
+ControlPanel.propTypes = {
+  song: React.PropTypes.instanceOf(siteapi.Song),
+  progress: React.PropTypes.number,
+  // hasPrev: React.PropTypes.bool,
+  // hasNext: React.PropTypes.bool,
+
+  onToggleQueue: React.PropTypes.func.isRequired,
+  onPlayPause: React.PropTypes.func.isRequired,
+  onGoNextSong: React.PropTypes.func.isRequired,
+  onGoPrevSong: React.PropTypes.func.isRequired,
+};
+
+
 export class Player extends React.Component {
   state: any;
   _play_manager: PlayManager;
+  queueNode: HTMLDivElement;
 
   constructor(props) {
     super(props);
@@ -278,51 +367,97 @@ export class Player extends React.Component {
     this._play_manager.current = queue._queue[queue._cur_playing];
     this._play_manager.notify();
   }
+  toggleQueueVisible() {
+    console.log(this);
+    if (this.queueNode.style.display == 'none') {
+      this.queueNode.style.display = 'block';
+    } else {
+      this.queueNode.style.display = 'none'
+    }
+  }
+  currentPlaying(): ?siteapi.Song {
+    let entry = this.props.queue._queue[this.props.queue._cur_playing];
+    if (entry == null) {
+      return undefined;
+    }
+    return entry.song;
+  }
   render() {
     let that = this;
     window.__xx = this;
 
+// ControlPanel.propTypes = {
+//   song: React.PropTypes.instanceOf(siteapi.Song),
+//   progress: React.PropTypes.number,
+//   // hasPrev: React.PropTypes.bool,
+//   // hasNext: React.PropTypes.bool,
+
+//   onToggleQueue: React.PropTypes.func.isRequired,
+//   onPause: React.PropTypes.func.isRequired,
+//   onResume: React.PropTypes.func.isRequired,
+//   onGoNextSong: React.PropTypes.func.isRequired,
+//   onGoPrevSong: React.PropTypes.func.isRequired,
+// };
+
     return (
       <div>
-        <h1>Queue</h1>
-        <table>
-          <thead>
-            <tr></tr>
-          </thead>
-          <tbody>
-            {this.props.queue._queue.map(function(entry, idx) {
-              return (
-                <QueueEntry
-                  song={entry.song}
-                  index={idx}
-                  onRemoveItem={this.props.onQueueRemove.bind(this)}
-                  onQueueAddNext={this.props.onQueueAddNext.bind(this)}
-                  onJumpTo={this.props.onQueueJumpTo.bind(this)}
-                  playing={idx == this.props.queue._cur_playing}
-                  />
-              );
-            }, this)}
-          </tbody>
-        </table>
-        <h1>Songs</h1>
-        <table>
-          <thead>
-            <tr></tr>
-          </thead>
-          <tbody>
-            {this.state.songs.results.map(function(song, idx) {
-              return (
-                <Song
-                  song={song}
-                  onPlay={this.playSong}
-                  onQueueAddNext={this.props.onQueueAddNext.bind(this)}
-                  onQueueAddLast={this.props.onQueueAddLast.bind(this)}
-                  onOpenAlbum={this.props.onOpenAlbum.bind(this)}
-                  />
-              );
-            }, this)}
-          </tbody>
-        </table>
+        <div style={{position: 'absolute', width: '100%', height: '48px'}}>
+          <ControlPanel
+            song={this.currentPlaying()}
+            progress={0.0}
+            onToggleQueue={this.toggleQueueVisible.bind(this)}
+            onPlayPause={this._play_manager.togglePause.bind(this._play_manager)}
+            onGoPrevSong={this.props.onQueueJumpPrev.bind(this)}
+            onGoNextSong={this.props.onQueueJumpNext.bind(this)}
+            />
+        </div>
+        <div style={{top: '48px', position: 'absolute', display: 'none', background: 'black'}}
+            ref={(queueNode) => { this.queueNode = queueNode; }}
+          >
+          <h1>Queue</h1>
+          <table>
+            <thead>
+              <tr></tr>
+            </thead>
+            <tbody>
+              {this.props.queue._queue.map(function(entry, idx) {
+                return (
+                  <QueueEntry
+                    key={"queue-entry-" + entry.queue_txid}
+                    song={entry.song}
+                    index={idx}
+                    onRemoveItem={this.props.onQueueRemove.bind(this)}
+                    onQueueAddNext={this.props.onQueueAddNext.bind(this)}
+                    onJumpTo={this.props.onQueueJumpTo.bind(this)}
+                    playing={idx == this.props.queue._cur_playing}
+                    />
+                );
+              }, this)}
+            </tbody>
+          </table>
+        </div>
+        <div style={{paddingTop: "48px" }}>
+          <h1>Songs</h1>
+          <table>
+            <thead>
+              <tr></tr>
+            </thead>
+            <tbody>
+              {this.state.songs.results.map(function(song, idx) {
+                return (
+                  <Song
+                    key={"song" + song.id}
+                    song={song}
+                    onPlay={this.playSong}
+                    onQueueAddNext={this.props.onQueueAddNext.bind(this)}
+                    onQueueAddLast={this.props.onQueueAddLast.bind(this)}
+                    onOpenAlbum={this.props.onOpenAlbum.bind(this)}
+                    />
+                );
+              }, this)}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }

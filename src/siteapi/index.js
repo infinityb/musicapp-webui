@@ -139,16 +139,44 @@ export class SongsAllRequest {
 }
 
 export class SongSearchResponse {
-    results: Array<Song>;
+    results: Array<Song>; // deprecated
+    _links: Map<String, any>;
+    _items: Array<String>;
+    _embedded: Map<String, any>;
 
     constructor() {
-        this.results = [];
+        this._links = new Map();
+        this._items = [];
+        this.results = this._items;
+        this._embedded = new Map();
     }
 
     static fromDoc(doc): SongSearchResponse {
         let out = new SongSearchResponse();
         for (let x of doc['results']) {
-            out.results.push(Song.fromDoc(x));
+            let song = new Song();
+            song.id = x['id'];
+            song.key = "song" + x['id'];
+            song._album = new Promise(function(resolve, reject) {
+                let album = new Album();
+                album.id = x['album']['id'];
+                album._art_blob = x['album']['art_blob'];
+                album._metadata = x['album']['metadata'];
+                resolve(album);
+            });
+
+            song._blob = x['blob'];
+            song._art_blob = x['album']['art_blob'];
+            song._length_ms = x['length_ms'];
+            song._track_no = x['track_no'];
+            song._metadata = {};
+            for (var k in x['album']['metadata']) {
+                song._metadata[k.toLowerCase()] = x['album']['metadata'][k];
+            }
+            for (var k in x['metadata']) {
+                song._metadata[k.toLowerCase()] = x['metadata'][k];
+            }
+            out.results.push(song);
         }
         return out;
     }
@@ -160,7 +188,7 @@ export class AlbumGetResponse {
     static fromDoc(doc): AlbumGetResponse {
         let out = new AlbumGetResponse();
         for (let x of doc['songs']) {
-            out.songs.push(Song.fromDoc(x));
+            // out.songs.push(Song.fromDoc(x));
         }
         return out;
     }
@@ -197,34 +225,19 @@ export class AlbumGetRequest {
 
 export class Song {
     id: number;
-    _album: Album;
+    key: string;
+    _album: Promise<Album>;
+    // _series: Promise<Series>;
     _blob: string;
+    _art_blob: string;
     _length_ms: number;
     _track_no: number;
     _metadata: Map<string, string>;
 
-    static fromDoc(doc: any): Song {
-        let out = new Song();
-        out.id = doc['id'];
-        out._album = Album.fromDoc(doc['album']);
-        out._blob = doc['blob'];
-        out._length_ms = doc['length_ms'];
-        out._track_no = doc['track_no'];
-        out._metadata = doc['metadata'];
-        return out;
-    }
-
     _getMetaField(field: string, defval: ?string = undefined): string {
-        let target = field.toUpperCase();
-        for (let [k, v] of Object.entries(this._metadata)) {
-            if (target == k.toUpperCase()) {
-                return v;
-            }
-        }
-        for (let [k, v] of Object.entries(this._album._metadata)) {
-            if (target == k.toUpperCase()) {
-                return v;
-            }
+        let value = this._metadata[field.toLowerCase()];
+        if (value != null) {
+            return value;
         }
         if (defval != null) {
             return defval;
@@ -233,15 +246,15 @@ export class Song {
     }
 
     title(defval:?string=undefined): string {
-        return this._getMetaField("TITLE", defval);
+        return this._getMetaField("title", defval);
     }
 
     artist(defval:?string=undefined): string {
-        return this._getMetaField("ARTIST", defval);
+        return this._getMetaField("artist", defval);
     }
 
     album(defval:?string=undefined): string {
-        return this._getMetaField("ALBUM", defval);
+        return this._getMetaField("album", defval);
     }
 
     duration(): string {
@@ -263,12 +276,11 @@ export class Album {
     id: number;
     _art_blob: string;
     _metadata: Map<string, string>;
+}
 
-    static fromDoc(doc: any): Album {
-        let out = new Album();
-        out.id = doc['id'];
-        out._art_blob = doc['art_blob'];
-        out._metadata = doc['metadata'];
-        return out;
-    }
+export class Series {
+    id: number;
+    _art_blob: string;
+    _background_art_blob: string;
+    _metadata: Map<string, string>;
 }

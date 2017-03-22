@@ -24,6 +24,14 @@ const mapDispatchToProps = (dispatch: Dispatch) => ({
     console.log("onQueueJumpTo", event.index);
     return dispatch(actions.queue_jump_to(event.index));
   },
+  onQueueJumpPrev: (event) => {
+    console.log("onQueueJumpPrev");
+    return dispatch(actions.decrement_index());
+  },
+  onQueueJumpNext: (event) => {
+    console.log("onQueueJumpNext");
+    return dispatch(actions.increment_index());
+  },
   onQueueRemove: (event) => {
     console.log("onQueueRemove", event.index);
     return dispatch(actions.queue_remove(event.index));

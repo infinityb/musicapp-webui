@@ -25,6 +25,10 @@ export const increment_index = () => ({
   type: types.PLAYLIST_MOVE_NEXT,
 });
 
+export const decrement_index = () => ({
+  type: types.PLAYLIST_MOVE_PREV,
+});
+
 export const noop = () => ({
   type: types.PLAYLIST_NOOP,
 });
